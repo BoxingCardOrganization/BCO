@@ -1,0 +1,54 @@
+{
+  "example_fighter": {
+    "name": "Example Fighter",
+    "weightClass": "Welterweight",
+    "country": "USA",
+    "winLossRecord": "27-1-0",
+    "fighterTier": {
+      "value": "A-Level Draw",
+      "source": "internal"
+    },
+    "keyStats": {
+      "highestTicketsSold": {
+        "value": 18000,
+        "source": "https://example.com/highest-tickets"
+      },
+      "highestGate": {
+        "value": "$12,500,000",
+        "source": "https://example.com/highest-gate"
+      },
+      "cardsSoldByBCO": {
+        "value": 4300,
+        "source": "internal"
+      }
+    },
+    "resaleStats": {
+      "totalResales": {
+        "value": 142,
+        "source": "internal"
+      },
+      "averageResalePrice": {
+        "value": 387.50,
+        "source": "internal"
+      },
+      "highestResalePrice": {
+        "value": 975,
+        "source": "internal"
+      }
+    },
+    "news": [
+      {
+        "title": "Example Fighter Calls Out Rival in Post-Fight Interview",
+        "url": "https://boxingnews.com/article/example-fighter-calls-out",
+        "date": "2025-08-01",
+        "source": "Boxing News"
+      },
+      {
+        "title": "Inside Example Fighter’s Training Camp",
+        "url": "https://espn.com/example-training-camp",
+        "date": "2025-07-24",
+        "source": "ESPN"
+      }
+    ]
+  }
+}
