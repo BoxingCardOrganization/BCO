@@ -1,0 +1,40 @@
+{
+  "domain": {
+    "name": "BCO-FighterCard",
+    "version": "1",
+    "chainId": 31337,
+    "verifyingContract": "0x5fbdb2315678afecb367f032d93f642f64180aa3"
+  },
+  "types": {
+    "MintAuth": [
+      {
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "name": "offerUsdCents",
+        "type": "uint256"
+      },
+      {
+        "name": "fighterId",
+        "type": "uint256"
+      },
+      {
+        "name": "deadline",
+        "type": "uint256"
+      },
+      {
+        "name": "nonce",
+        "type": "bytes32"
+      }
+    ]
+  },
+  "mint": {
+    "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+    "offerUsdCents": 4000,
+    "fighterId": 555,
+    "deadline": 1755379954,
+    "nonce": "0x371d08b4aa4b97f8679c08b8c0ba87dd4dc2803d4daa4328b1d8044eac71b10f"
+  },
+  "sig": "0x7a08e19a8cf2705668d62c21874fa7f598e8389aa0bd1f28f1b4a61adfb2af5d5274ee1011250599b68d77d5150cf8123e6d61c467f2197d7f41914d16fe9c811c"
+}

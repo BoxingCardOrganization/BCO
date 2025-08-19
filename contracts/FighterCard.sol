@@ -1,49 +1,177 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+/**
+ * BCO FighterCard (MVP)
+ * - Signature-gated mint (EIP-712)
+ * - Stores offer amount (USD cents) at mint
+ * - Exposes getMintPrice() and getCardValue() for Fightfolio reads
+ * - Optional Fightfolio hook called on every transfer/mint/burn
+ * - Per-fighter max supply cap (optional: 0 = unlimited)
+ * - No Enumerable (keeps inheritance simple & avoids override errors)
+ */
 
-contract FighterCard is ERC721URIStorage, ERC721Enumerable, Ownable {
-    uint256 private _tokenIdCounter;
+import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-    // Store the mint price for each card
-    mapping(uint256 => uint256) public mintPrices;
+interface IFightfolioHook {
+    function onTransfer(address from, address to, uint256 tokenId) external;
+}
 
-    constructor(address initialOwner) ERC721("FighterCard", "FTR") Ownable(initialOwner) {}
+contract FighterCard is ERC721, Ownable, EIP712 {
+    using ECDSA for bytes32;
 
-    function mintCard(address to, string memory tokenURI, uint256 price) public onlyOwner {
-        _tokenIdCounter += 1;
-        uint256 tokenId = _tokenIdCounter;
+    // -------- Storage --------
+    uint256 private _nextId = 1;
+    address public signer;                  // backend signer authorizing paid mints
+    IFightfolioHook public fightfolioHook;  // optional on-chain indexer/hook
 
-        _mint(to, tokenId);
-        _setTokenURI(tokenId, tokenURI);
-        mintPrices[tokenId] = price;
+    // Pricing / values (USD cents)
+    mapping(uint256 => uint256) private _mintPriceUsdCents;    // tokenId => price paid at mint
+    mapping(uint256 => uint256) private _currentValueUsdCents; // tokenId => current valuation (admin/engine set)
+
+    // Business metadata
+    mapping(uint256 => uint256) public fighterIdOf; // tokenId => fighterId
+    mapping(uint256 => bool)    public isRedeemed;  // tokenId => redeemed flag
+
+    // Per-fighter supply controls
+    mapping(uint256 => uint256) public maxSupplyByFighter; // fighterId => max supply (0 = unlimited)
+    mapping(uint256 => uint256) public mintedByFighter;    // fighterId => minted count
+
+    // Sig replay protection
+    mapping(bytes32 => bool) public usedNonce;
+
+    // -------- EIP-712 types --------
+    struct MintAuth {
+        address to;            // recipient wallet (smart account)
+        uint256 offerUsdCents; // e.g., 4000 = $40.00
+        uint256 fighterId;     // which fighter this card refers to
+        uint256 deadline;      // unix seconds
+        bytes32 nonce;         // unique per mint
     }
 
+    bytes32 private constant MINT_TYPEHASH =
+        keccak256("MintAuth(address to,uint256 offerUsdCents,uint256 fighterId,uint256 deadline,bytes32 nonce)");
+
+    // -------- Events --------
+    event Minted(address indexed to, uint256 indexed tokenId, uint256 indexed fighterId, uint256 offerUsdCents);
+    event Redeemed(uint256 indexed tokenId);
+    event CardValueUpdated(uint256 indexed tokenId, uint256 newValueUsdCents);
+    event SignerUpdated(address indexed newSigner);
+    event FightfolioHookSet(address indexed hook);
+    event MaxSupplySet(uint256 indexed fighterId, uint256 maxSupply);
+
+    // -------- Constructor --------
+    constructor(address initialSigner)
+        ERC721("BCO Fighter Card", "BCOFC")
+        EIP712("BCO-FighterCard", "1")
+        Ownable(msg.sender)
+    {
+        signer = initialSigner;
+        emit SignerUpdated(initialSigner);
+    }
+
+    // -------- Admin --------
+    function setSigner(address s) external onlyOwner {
+        require(s != address(0), "bad signer");
+        signer = s;
+        emit SignerUpdated(s);
+    }
+
+    function setFightfolioHook(address hook) external onlyOwner {
+        fightfolioHook = IFightfolioHook(hook);
+        emit FightfolioHookSet(hook);
+    }
+
+    /// Optional per-fighter cap (0 = unlimited). Cannot be set below current minted.
+    function setMaxSupply(uint256 fighterId, uint256 maxSupply) external onlyOwner {
+        require(maxSupply >= mintedByFighter[fighterId], "below minted");
+        maxSupplyByFighter[fighterId] = maxSupply;
+        emit MaxSupplySet(fighterId, maxSupply);
+    }
+
+    /// Update current valuation in USD cents (from your pricing engine/oracle/admin)
+    function setCardValue(uint256 tokenId, uint256 newValueUsdCents) external onlyOwner {
+        require(_exists(tokenId), "no token");
+        _currentValueUsdCents[tokenId] = newValueUsdCents;
+        emit CardValueUpdated(tokenId, newValueUsdCents);
+    }
+
+    /// Mark a token redeemed (tickets issued). You can gate this to an authorized role later.
+    function setRedeemed(uint256 tokenId, bool redeemed) external onlyOwner {
+        require(_exists(tokenId), "no token");
+        isRedeemed[tokenId] = redeemed;
+        if (redeemed) emit Redeemed(tokenId);
+    }
+
+    // -------- Mint (signature-gated) --------
+    function mintWithSig(MintAuth calldata m, bytes calldata sig) external returns (uint256 tokenId) {
+        require(block.timestamp <= m.deadline, "expired");
+        require(m.to != address(0), "bad to");
+        require(!usedNonce[m.nonce], "nonce used");
+
+        // EIP-712 digest
+        bytes32 digest = _hashTypedDataV4(
+            keccak256(abi.encode(MINT_TYPEHASH, m.to, m.offerUsdCents, m.fighterId, m.deadline, m.nonce))
+        );
+        address recovered = ECDSA.recover(digest, sig);
+        require(recovered == signer, "bad sig");
+
+        // Enforce per-fighter max supply (0 = unlimited)
+        uint256 fid = m.fighterId;
+        uint256 newMinted = mintedByFighter[fid] + 1;
+        uint256 maxS = maxSupplyByFighter[fid];
+        require(maxS == 0 || newMinted <= maxS, "sold out");
+        mintedByFighter[fid] = newMinted;
+
+        usedNonce[m.nonce] = true;
+
+        tokenId = _nextId++;
+        _safeMint(m.to, tokenId);
+
+        // Record economics/metadata
+        _mintPriceUsdCents[tokenId]    = m.offerUsdCents;
+        _currentValueUsdCents[tokenId] = m.offerUsdCents; // initialize current value to offer; update off-chain later
+        fighterIdOf[tokenId]           = m.fighterId;
+
+        emit Minted(m.to, tokenId, m.fighterId, m.offerUsdCents);
+    }
+
+    // -------- Public views (Fightfolio expects these) --------
+    /// Price paid at mint time (USD cents)
     function getMintPrice(uint256 tokenId) external view returns (uint256) {
-        return mintPrices[tokenId];
+        return _mintPriceUsdCents[tokenId];
     }
 
-    function totalMinted() public view returns (uint256) {
-        return _tokenIdCounter;
+    /// Current valuation (USD cents) – settable by admin/engine
+    function getCardValue(uint256 tokenId) external view returns (uint256) {
+        return _currentValueUsdCents[tokenId];
     }
 
-    // Required overrides for ERC721 + ERC721Enumerable
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+    // -------- Internal hook to notify Fightfolio on ownership changes --------
+    // OZ 5.x _update is called for mint, transfer, and burn. We forward to our hook if set.
+    function _update(address to, uint256 tokenId, address auth)
         internal
-        override(ERC721, ERC721Enumerable)
+        override
+        returns (address from)
     {
-        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        from = super._update(to, tokenId, auth);
+        if (address(fightfolioHook) != address(0)) {
+            // try/catch so a broken hook can't block transfers
+            try fightfolioHook.onTransfer(from, to, tokenId) {} catch {}
+        }
     }
 
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721, ERC721Enumerable)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
+    // -------- Utilities --------
+    function _exists(uint256 tokenId) internal view returns (bool) {
+        // ownerOf reverts for nonexistent; wrap in try-catch for a boolean exists check
+        try this.ownerOf(tokenId) returns (address) {
+            return true;
+        } catch {
+            return false;
+        }
     }
 }
+
