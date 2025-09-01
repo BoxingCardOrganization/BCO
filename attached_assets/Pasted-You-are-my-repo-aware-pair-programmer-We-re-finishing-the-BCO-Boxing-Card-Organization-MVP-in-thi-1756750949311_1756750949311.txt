@@ -1,0 +1,65 @@
+You are my repo-aware pair-programmer. We’re finishing the BCO (Boxing Card Organization) MVP in this Replit project.
+Stack: Node.js + Hardhat, Solidity contracts, JS/TS scripts, unit tests.
+Existing modules (naming may vary): FighterCard, Fightfolio, TradingRing, mint/sign scripts (quoteMint.js, signMintAuth.js, mintWithSig.js), cap management, profile sync scripts.
+
+Non-negotiable business rules
+
+Supply rule: card supply per fighter = floor(50% of highest recorded headlined attendance); caps can only go up, never down.
+
+Refunds: always at original mint price (not resale); resale exists only for demand signaling, not speculation.
+
+Fan tiers: Casual = 1.0, Analyst = 1.2, Historian = 1.5, Purist = 2.0.
+
+Trading Ring scoring: rank by Fightfolio Value (FV), Recency (R with exponential decay), Fan Tier multiplier (FT), optional Engagement (E).
+
+Redemption: NFTs remain sealed until fighter opts in; on redemption the NFT is burned and the holder receives a ticket via partner.
+
+No likeness usage.
+
+Development style
+
+Clean, explicit, production-quality code. No placeholders.
+
+Small, reviewable changes. Always add/extend tests.
+
+Use existing scripts (npm run chain, npm run deploy, npm test) and keep file structure.
+
+What to do first
+
+Scan the repo and list: current contracts, scripts, and tests; any TODOs; missing guardrails.
+
+Produce a one-page implementation plan for the MVP, broken into 3–6 increments. Each increment must include: scope, files to touch, new tests, and a clear “Definition of Done”.
+
+Then implement increment 1 (end-to-end)
+
+Make code changes and show a full diff (file paths + contents).
+
+Add tests covering happy path + edge cases; ensure npx hardhat test can pass.
+
+Update or create lightweight docs: SPEC.md (if missing), API.md, ROADMAP.md, .env.example.
+
+If secrets are needed, reference Replit Secrets (do not hardcode).
+
+Priority backlog (adjust to match repo reality)
+
+Dynamic Fan Tier: implement getFanTier(address) using on-chain holdings and/or recorded activity; remove any hardcoded tiers.
+
+TradingRing scoring: implement formula score = log(1+FV) * FT * exp(-λ * ageSeconds) * (1 + E) with sane defaults; make λ configurable; add tests for decay + ordering.
+
+FighterCard fields: ensure offerAmount, redeemed, cap, and EIP-712 mintWithSig are in place and validated; add cap-increase-only guard + tests.
+
+Fightfolio weekly values: cron/task or script to recompute and persist values weekly; write tests for snapshot/rollover behavior.
+
+Refund logic: implement refund at original mint price, minus fees; log refunds and separate “context-linked” vs “uncontexted” events; do not allow refund to alter price without external news context flag.
+
+CLI & scripts: polish syncProfilesFromChain and validateProfiles; add usage docs.
+
+Output format
+
+Show the plan first.
+
+Then show code diffs for increment 1 (contracts, scripts, tests, docs).
+
+Finish with exact commands to run locally in Replit (e.g., npm install, npm run chain, new terminal npm test, new terminal npm run deploy), and any Secrets to set.
+
+Begin by scanning the repo and proposing the implementation plan. Do not write vague advice—write code and tests that pass.
