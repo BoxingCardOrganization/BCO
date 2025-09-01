@@ -13,6 +13,8 @@ function FighterPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [expandedFAQ, setExpandedFAQ] = useState(null)
+  const [weeklyFV, setWeeklyFV] = useState(null)
+  const [fvHistory, setFvHistory] = useState([])
 
   useEffect(() => {
     loadFighter()
@@ -24,6 +26,18 @@ function FighterPage() {
       setError(null)
       const data = await api.getFighter(id)
       setFighter(data)
+      
+      // Load FV data
+      try {
+        const [currentFV, fvHistoryData] = await Promise.all([
+          api.getCurrentFV(id),
+          api.getFVHistory(id, 8) // Last 8 weeks
+        ])
+        setWeeklyFV(currentFV)
+        setFvHistory(fvHistoryData)
+      } catch (fvError) {
+        console.log('FV data not available:', fvError.message)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -94,7 +108,7 @@ function FighterPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <FighterStatTile 
             label="Current Price"
             value={formatCurrency(fighter.currentPrice)}
@@ -102,6 +116,17 @@ function FighterPage() {
             icon={
               <svg className="w-6 h-6 text-bco-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+            }
+          />
+          
+          <FighterStatTile 
+            label="Fightfolio Value"
+            value={weeklyFV ? formatCurrency(weeklyFV.fightfolioValue) : 'N/A'}
+            sublabel="Weekly FV"
+            icon={
+              <svg className="w-6 h-6 text-bco-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             }
           />
@@ -162,6 +187,100 @@ function FighterPage() {
             </p>
           </div>
         </div>
+
+        {/* Fightfolio Value Breakdown */}
+        {weeklyFV && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Fightfolio Value Analysis</h2>
+              <div className="text-sm text-gray-600">
+                Week ending {weeklyFV.weekEnding}
+              </div>
+            </div>
+            
+            {/* Components Breakdown */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-blue-900">
+                  {formatCurrency(weeklyFV.components.offerSignal)}
+                </div>
+                <div className="text-sm text-blue-700">Offer Signal (40%)</div>
+                <div className="text-xs text-blue-600">Based on offer volume & diversity</div>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-900">
+                  {formatCurrency(weeklyFV.components.resaleSignal)}
+                </div>
+                <div className="text-sm text-green-700">Resale Signal (30%)</div>
+                <div className="text-xs text-green-600">Bounded to prevent speculation</div>
+              </div>
+              <div className="bg-purple-50 rounded-lg p-4">
+                <div className="text-2xl font-bold text-purple-900">
+                  {formatCurrency(weeklyFV.components.publicSignal)}
+                </div>
+                <div className="text-sm text-purple-700">Public Signal (30%)</div>
+                <div className="text-xs text-purple-600">Normalized performance metrics</div>
+              </div>
+            </div>
+
+            {/* News Factor */}
+            {weeklyFV.components.newsFactor !== 1.0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-yellow-900">News Factor Applied</span>
+                  <span className="text-lg font-bold text-yellow-900">
+                    {weeklyFV.components.newsFactor.toFixed(2)}x
+                  </span>
+                </div>
+                <div className="text-sm text-yellow-800 mt-1">
+                  Recent news events have {weeklyFV.components.newsFactor > 1 ? 'positively' : 'negatively'} impacted the Fighter Value
+                </div>
+              </div>
+            )}
+
+            {/* FV History Chart */}
+            {fvHistory.length > 0 && (
+              <div>
+                <h3 className="font-medium text-gray-900 mb-3">8-Week FV Trend</h3>
+                <div className="flex items-end space-x-2 h-24">
+                  {fvHistory.map((week, index) => {
+                    const maxFV = Math.max(...fvHistory.map(w => w.fightfolioValue))
+                    const height = (week.fightfolioValue / maxFV) * 100
+                    return (
+                      <div key={index} className="flex-1 flex flex-col items-center">
+                        <div 
+                          className="w-full bg-bco-primary rounded-t"
+                          style={{ height: `${height}%` }}
+                          title={`${week.weekEnding}: ${formatCurrency(week.fightfolioValue)}`}
+                        />
+                        <div className="text-xs text-gray-600 mt-1 transform -rotate-45 origin-top-left">
+                          {week.weekEnding.slice(5)}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Source Citations */}
+            {weeklyFV.sources && Object.keys(weeklyFV.sources).length > 0 && (
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <h4 className="font-medium text-gray-900 mb-2">Data Sources</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                  {Object.entries(weeklyFV.sources).map(([metric, url]) => url && (
+                    <div key={metric} className="flex items-center justify-between">
+                      <span className="text-gray-600 capitalize">{metric.replace(/([A-Z])/g, ' $1')}:</span>
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-bco-primary hover:underline">
+                        View Source
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* FAQ Accordion */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { api } from '../lib/api'
-import { formatTimeAgo, formatAddress } from '../lib/format'
-import { getTierName } from '../lib/scoring'
+import { formatTimeAgo, formatAddress, formatCurrency } from '../lib/format'
+import { getTierName, calculateScore } from '../lib/scoring'
 import Loading from '../components/Loading'
 import ErrorState from '../components/ErrorState'
 import EmptyState from '../components/EmptyState'
@@ -13,10 +13,23 @@ function TradingRing() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [posting, setPosting] = useState(false)
+  const [userFV, setUserFV] = useState(0)
+  const [userTier, setUserTier] = useState(2)
 
   useEffect(() => {
     loadMessages()
+    loadUserProfile()
   }, [])
+
+  const loadUserProfile = async () => {
+    try {
+      const profile = await api.getUserProfile()
+      setUserFV(profile.fightfolioValue || 0)
+      setUserTier(profile.fanTier || 2)
+    } catch (err) {
+      console.log('Could not load user profile:', err.message)
+    }
+  }
 
   const loadMessages = async () => {
     try {
@@ -39,7 +52,20 @@ function TradingRing() {
 
     try {
       setPosting(true)
-      const message = await api.postMessage(newMessage.trim())
+      
+      // Calculate score using current FV
+      const ageSeconds = 0 // New message
+      const engagement = 0 // No engagement yet
+      const score = calculateScore(userFV, userTier, ageSeconds, engagement)
+      
+      const messageData = {
+        content: newMessage.trim(),
+        fightfolioValue: userFV,
+        fanTier: userTier,
+        score: score
+      }
+      
+      const message = await api.postMessage(messageData)
       setMessages([message, ...messages])
       setNewMessage('')
     } catch (err) {
@@ -97,10 +123,11 @@ function TradingRing() {
             </div>
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Analyst Tier
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTierColor(userTier)}`}>
+                  {getTierName(userTier)} Tier
                 </span>
-                <span className="ml-2">Score multiplier: 1.2x</span>
+                <span className="ml-2">FV: {formatCurrency(userFV)}</span>
+                <span className="ml-2">Score multiplier: {getTierMultiplier(userTier)}x</span>
               </div>
               <button 
                 type="submit"

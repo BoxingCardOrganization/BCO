@@ -1,4 +1,3 @@
-
 import React from 'react'
 import { Routes, Route } from 'react-router-dom'
 import NavBar from './components/NavBar'
@@ -8,6 +7,7 @@ import FighterPage from './pages/FighterPage'
 import TradingRing from './pages/TradingRing'
 import Wallet from './pages/Wallet'
 import Onboarding from './pages/Onboarding'
+import AdminValuations from './pages/AdminValuations'
 
 function App() {
   return (
@@ -16,11 +16,12 @@ function App() {
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/offer-builder" element={<OfferBuilder />} />
           <Route path="/fighter/:id" element={<FighterPage />} />
           <Route path="/trading-ring" element={<TradingRing />} />
           <Route path="/wallet" element={<Wallet />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/admin/valuations" element={<AdminValuations />} />
         </Routes>
       </main>
     </div>

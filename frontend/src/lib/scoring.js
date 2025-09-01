@@ -33,3 +33,6 @@ export function getTierName(tier) {
   }
   return names[tier] || "Unknown"
 }
+
+// Export the existing function that's already defined above
+export { getTierMultiplier }

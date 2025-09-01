@@ -9,7 +9,8 @@
     "dev": "concurrently \"npm run chain\" \"npm run start\"",
     "compile": "npx hardhat compile",
     "test": "npx hardhat test",
-    "deploy:local": "npx hardhat run scripts/deployLocal.js --network localhost"
+    "deploy:local": "npx hardhat run scripts/deployLocal.js --network localhost",
+    "valuations:run": "node scripts/computeWeeklyValuations.js"
   },
   "dependencies": {
     "express": "^4.18.2",
