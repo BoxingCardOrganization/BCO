@@ -4,6 +4,19 @@ const path = require('path');
 const app = express();
 const PORT = 5000;
 
+// Middleware for parsing JSON (with error handling)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
+
+// Error handling middleware for JSON parsing
+app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        console.error('Bad JSON:', err.message);
+        return res.status(400).json({ error: 'Invalid JSON' });
+    }
+    next();
+});
+
 // Serve static files
 app.use(express.static('.'));
 
