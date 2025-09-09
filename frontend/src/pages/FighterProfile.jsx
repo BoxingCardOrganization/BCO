@@ -1,0 +1,130 @@
+import React, { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
+import { getJSON } from '../lib/api'
+import Loading from '../components/Loading'
+import ErrorState from '../components/ErrorState'
+import CrownBar from '../components/CrownBar'
+
+function FighterProfile() {
+  const { id } = useParams()
+  const [fighter, setFighter] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const formatUSD = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n || 0))
+
+  const load = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await getJSON(`/api/fighters/${encodeURIComponent(id)}`)
+      setFighter(data)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [id])
+
+  if (loading) return <Loading />
+  if (error) return <ErrorState title="Failed to load fighter" description={error} onRetry={load} />
+  if (!fighter) return <ErrorState title="Not found" description="Fighter not found" />
+
+  const delta = Number(fighter.deltaFV || 0)
+  const isUp = delta >= 0
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Link to="/" className="inline-flex items-center text-bco-primary hover:text-bco-primary/80 mb-6">
+          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Back to Home
+        </Link>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{fighter.name}</h1>
+              <div className="text-gray-700">
+                <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  {fighter.fighterTier}
+                </span>
+              </div>
+            </div>
+            <div className="mt-4 md:mt-0 flex items-center gap-3">
+              <Link to={`/offer-builder?fighter=${encodeURIComponent(fighter.id)}`} className="btn-primary">Buy</Link>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2">
+            <CrownBar titles={fighter.titles || []} />
+            <span className="text-sm text-gray-600">
+              {Array.isArray(fighter.titles) && fighter.titles.length > 0 ? fighter.titles.join(' • ') : 'No recognized titles'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div className="p-4 bg-gray-50 rounded">
+              <div className="text-sm text-gray-600">FV (current)</div>
+              <div className="text-xl font-semibold">{formatUSD(fighter.valuation)}</div>
+            </div>
+            <div className="p-4 bg-gray-50 rounded">
+              <div className="text-sm text-gray-600">Prev FV</div>
+              <div className="text-xl font-semibold">{formatUSD(fighter.prevValuation)}</div>
+            </div>
+            <div className="p-4 bg-gray-50 rounded">
+              <div className="text-sm text-gray-600">Weekly Change</div>
+              <div className={`text-xl font-semibold ${isUp ? 'text-green-600' : 'text-red-600'}`}>{isUp ? '▲' : '▼'} {formatUSD(Math.abs(delta))}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        {fighter.stats && Object.keys(fighter.stats).length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Stats</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.entries(fighter.stats).map(([k, v]) => (
+                <div key={k} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <div className="text-gray-600 capitalize">{k.replace(/([A-Z])/g, ' $1')}</div>
+                  <div className="text-gray-900 font-medium">{String(v?.value ?? v)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* News */}
+        {Array.isArray(fighter.news) && fighter.news.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">News</h2>
+            <ul className="space-y-3">
+              {fighter.news.map((n, idx) => (
+                <li key={idx} className="flex items-center justify-between">
+                  <div>
+                    <a href={n.url} target="_blank" rel="noopener noreferrer" className="text-bco-primary hover:underline font-medium">
+                      {n.title || n.url}
+                    </a>
+                    {n.date && <div className="text-xs text-gray-500">{n.date}</div>}
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                  </svg>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default FighterProfile
+

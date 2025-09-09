@@ -1,0 +1,17 @@
+[
+  {
+    "id": "example-1",
+    "name": "Example Fighter",
+    "fighterTier": "A-Level Draw",
+    "valuation": 4200,
+    "prevValuation": 3900,
+    "stats": {
+      "highestTicketsSold": 18000,
+      "highestGate": 12500000,
+      "cardsSoldByBCO": 4300
+    },
+    "news": [
+      { "title": "Training camp update", "url": "https://example.com/news", "date": "2025-07-24" }
+    ]
+  }
+]

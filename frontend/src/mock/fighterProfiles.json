@@ -1,0 +1,53 @@
+{
+  "canelo": {
+    "id": "canelo",
+    "name": "Saul 'Canelo' Alvarez",
+    "fighterId": "canelo",
+    "titles": ["WBA","WBC","IBF","WBO"],
+    "crownsOwned": 4,
+    "weight": "168 lbs",
+    "record": "61-2-2",
+    "currentPrice": 5800000,
+    "highestAttendance": 73000,
+    "currentCap": 36500,
+    "mintedCount": 18200,
+    "lastFight": "2025-05-12",
+    "fvNow": 5800000,
+    "deltaFV": 120000,
+    "tier": "PPV Star",
+    "recentActivity": [
+      {"timestamp": "2025-09-08T16:20:00Z", "event": "Signed new broadcast deal"},
+      {"timestamp": "2025-09-01T10:12:00Z", "event": "Rumors of unification defense"}
+    ],
+    "weekly": [
+      {"weekEnding": "2025-08-24", "value": 5600000},
+      {"weekEnding": "2025-08-31", "value": 5680000},
+      {"weekEnding": "2025-09-07", "value": 5800000}
+    ]
+  },
+  "usyk": {
+    "id": "usyk",
+    "name": "Oleksandr Usyk",
+    "fighterId": "usyk",
+    "titles": ["WBA","WBO","IBF","WBC"],
+    "crownsOwned": 4,
+    "weight": "224 lbs",
+    "record": "23-0-0",
+    "currentPrice": 5100000,
+    "highestAttendance": 67000,
+    "currentCap": 33500,
+    "mintedCount": 21000,
+    "lastFight": "2025-05-18",
+    "fvNow": 5100000,
+    "deltaFV": 90000,
+    "tier": "PPV Star",
+    "recentActivity": [
+      {"timestamp": "2025-09-06T12:00:00Z", "event": "Press tour dates announced"}
+    ],
+    "weekly": [
+      {"weekEnding": "2025-08-24", "value": 5000000},
+      {"weekEnding": "2025-08-31", "value": 5050000},
+      {"weekEnding": "2025-09-07", "value": 5100000}
+    ]
+  }
+}

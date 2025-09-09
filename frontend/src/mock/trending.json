@@ -1,0 +1,8 @@
+[
+  { "rank": 1, "fighterId": "canelo", "fighterName": "Canelo Alvarez", "fvNow": 5800000, "sevenDayChangePct": 12.5 },
+  { "rank": 2, "fighterId": "usyk", "fighterName": "Oleksandr Usyk", "fvNow": 5100000, "sevenDayChangePct": 8.2 },
+  { "rank": 3, "fighterId": "inoue", "fighterName": "Naoya Inoue", "fvNow": 3800000, "sevenDayChangePct": 14.0 },
+  { "rank": 4, "fighterId": "crawford", "fighterName": "Terence Crawford", "fvNow": 3500000, "sevenDayChangePct": 6.1 },
+  { "rank": 5, "fighterId": "beterbiev", "fighterName": "Artur Beterbiev", "fvNow": 2600000, "sevenDayChangePct": 5.3 },
+  { "rank": 6, "fighterId": "bivol", "fighterName": "Dmitry Bivol", "fvNow": 2100000, "sevenDayChangePct": 4.7 }
+]

@@ -15,3 +15,31 @@ node_modules
 
 # Hardhat Ignition default folder for deployments against a local node
 ignition/deployments/chain-31337
+
+# Node / Vite / React
+node_modules/
+frontend/node_modules/
+dist/
+build/
+.vite/
+*.log
+
+# Env & secrets
+.env
+.env.*
+frontend/.env
+frontend/.env.*
+
+# Hardhat artifacts & cache
+contracts/artifacts/
+contracts/cache/
+artifacts/
+cache/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json

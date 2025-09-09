@@ -1,21 +1,42 @@
 {
   "name": "bco-platform",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "Boxing Card Organization - Digital Fighter Cards Platform",
+  "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "chain": "npx hardhat node",
+    "start": "node app.js",
+    "backend": "node app.js",
+    "frontend": "cd frontend && npm run dev",
+    "stack": "concurrently -k -n CHAIN,BACKEND,FRONTEND \"npm:chain\" \"npm:backend\" \"npm:frontend\"",
+    "dev": "concurrently \"npm run chain\" \"npm run start\"",
+    "chain:alt": "npx hardhat node --port 8546",
+    "start:alt": "set PORT=3002&& node app.js",
+    "start:alt:posix": "PORT=3002 node app.js",
+    "dev:alt": "concurrently \"npm run chain:alt\" \"npm run start:alt\"",
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:local": "npx hardhat run scripts/deployLocal.js --network localhost",
+    "valuations:run": "node scripts/computeWeeklyValuations.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@openzeppelin/contracts": "^5.0.0",
-    "dotenv": "^17.2.1",
-    "express": "^5.1.0"
+    "concurrently": "^8.2.2",
+    "cors": "^2.8.5",
+    "ethers": "^6.8.1",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
-    "hardhat": "^2.26.2"
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "dotenv": "^17.2.2",
+    "hardhat": "^2.17.1"
   },
-  "description": ""
+  "keywords": [
+    "blockchain",
+    "nft",
+    "boxing",
+    "trading-cards"
+  ],
+  "author": "BCO Team",
+  "license": "MIT"
 }

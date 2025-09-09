@@ -39,6 +39,7 @@ contract FighterCard is ERC721, Ownable, EIP712 {
     // Per-fighter supply controls
     mapping(uint256 => uint256) public maxSupplyByFighter; // fighterId => max supply (0 = unlimited)
     mapping(uint256 => uint256) public mintedByFighter;    // fighterId => minted count
+    mapping(uint256 => uint256) public attendanceRecord;   // fighterId => highest headlined attendance
 
     // Sig replay protection
     mapping(bytes32 => bool) public usedNonce;
@@ -62,6 +63,8 @@ contract FighterCard is ERC721, Ownable, EIP712 {
     event SignerUpdated(address indexed newSigner);
     event FightfolioHookSet(address indexed hook);
     event MaxSupplySet(uint256 indexed fighterId, uint256 maxSupply);
+    event AttendanceRecorded(uint256 indexed fighterId, uint256 attendance);
+    event CapCalculated(uint256 indexed fighterId, uint256 attendance, uint256 calculatedCap);
 
     // -------- Constructor --------
     constructor(address initialSigner)
@@ -85,11 +88,39 @@ contract FighterCard is ERC721, Ownable, EIP712 {
         emit FightfolioHookSet(hook);
     }
 
-    /// Optional per-fighter cap (0 = unlimited). Cannot be set below current minted.
-    function setMaxSupply(uint256 fighterId, uint256 maxSupply) external onlyOwner {
-        require(maxSupply >= mintedByFighter[fighterId], "below minted");
-        maxSupplyByFighter[fighterId] = maxSupply;
-        emit MaxSupplySet(fighterId, maxSupply);
+    /// Record attendance and calculate supply cap (50% of highest attendance)
+    function recordAttendance(uint256 fighterId, uint256 attendance) external onlyOwner {
+        require(attendance > 0, "attendance must be positive");
+        
+        // Only allow attendance increases (can't reduce historical max)
+        require(attendance >= attendanceRecord[fighterId], "attendance cannot decrease");
+        
+        attendanceRecord[fighterId] = attendance;
+        emit AttendanceRecorded(fighterId, attendance);
+        
+        // Calculate new cap: 50% of attendance, rounded down
+        uint256 newCap = attendance / 2;
+        
+        // Cap can only increase, never decrease
+        if (newCap > maxSupplyByFighter[fighterId]) {
+            maxSupplyByFighter[fighterId] = newCap;
+            emit MaxSupplySet(fighterId, newCap);
+        }
+        
+        emit CapCalculated(fighterId, attendance, newCap);
+    }
+
+    /// Manual cap override (only to increase, for special cases)
+    function increaseMaxSupply(uint256 fighterId, uint256 newMaxSupply) external onlyOwner {
+        require(newMaxSupply > maxSupplyByFighter[fighterId], "can only increase cap");
+        require(newMaxSupply >= mintedByFighter[fighterId], "below minted");
+        maxSupplyByFighter[fighterId] = newMaxSupply;
+        emit MaxSupplySet(fighterId, newMaxSupply);
+    }
+
+    /// Get fighter attendance record
+    function getAttendanceRecord(uint256 fighterId) external view returns (uint256) {
+        return attendanceRecord[fighterId];
     }
 
     /// Update current valuation in USD cents (from your pricing engine/oracle/admin)

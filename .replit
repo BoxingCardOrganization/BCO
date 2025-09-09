@@ -1,0 +1,48 @@
+modules = ["nodejs-20"]
+run = "node index.js"
+
+[nix]
+channel = "stable-25_05"
+
+[deployment]
+run = ["sh", "-c", "node index.js"]
+
+[workflows]
+runButton = "Start BCO Platform"
+
+[[workflows.workflow]]
+name = "Start Development"
+author = 47127426
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx hardhat node"
+
+[[workflows.workflow]]
+name = "Start BCO Platform"
+author = 47127426
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx hardhat node"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node app.js"
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
+
+[[ports]]
+localPort = 5000
+externalPort = 5000
+
+[[ports]]
+localPort = 8545
+externalPort = 80
+
+[agent]
+expertMode = true

@@ -1,0 +1,14 @@
+[
+  { "id": "canelo", "fighterId": "canelo", "fighterName": "Saul 'Canelo' Alvarez", "titles": ["WBA","WBC","IBF","WBO"], "crownsOwned": 4, "fvNow": 5800000, "deltaFV": 120000, "tier": "PPV Star" },
+  { "id": "usyk", "fighterId": "usyk", "fighterName": "Oleksandr Usyk", "titles": ["WBA","WBO","IBF","WBC"], "crownsOwned": 4, "fvNow": 5100000, "deltaFV": 90000, "tier": "PPV Star" },
+  { "id": "fury", "fighterId": "fury", "fighterName": "Tyson Fury", "titles": ["WBC"], "crownsOwned": 3, "fvNow": 4800000, "deltaFV": -45000, "tier": "PPV Star" },
+  { "id": "tank", "fighterId": "tank", "fighterName": "Gervonta Davis", "titles": ["WBA"], "crownsOwned": 3, "fvNow": 4200000, "deltaFV": 80000, "tier": "A-Level Draw" },
+  { "id": "spence", "fighterId": "spence", "fighterName": "Errol Spence Jr.", "titles": [], "crownsOwned": 2, "fvNow": 2900000, "deltaFV": -20000, "tier": "A-Level Draw" },
+  { "id": "crawford", "fighterId": "crawford", "fighterName": "Terence Crawford", "titles": ["WBO"], "crownsOwned": 3, "fvNow": 3500000, "deltaFV": 70000, "tier": "A-Level Draw" },
+  { "id": "bivol", "fighterId": "bivol", "fighterName": "Dmitry Bivol", "titles": ["WBA"], "crownsOwned": 2, "fvNow": 2100000, "deltaFV": 30000, "tier": "Regional Headliner" },
+  { "id": "beterbiev", "fighterId": "beterbiev", "fighterName": "Artur Beterbiev", "titles": ["WBC","IBF","WBO"], "crownsOwned": 3, "fvNow": 2600000, "deltaFV": 50000, "tier": "Regional Headliner" },
+  { "id": "inoue", "fighterId": "inoue", "fighterName": "Naoya Inoue", "titles": ["WBC","WBO","IBF","WBA"], "crownsOwned": 4, "fvNow": 3800000, "deltaFV": 100000, "tier": "A-Level Draw" },
+  { "id": "haney", "fighterId": "haney", "fighterName": "Devin Haney", "titles": ["WBC"], "crownsOwned": 2, "fvNow": 1900000, "deltaFV": 40000, "tier": "Fringe Contender" },
+  { "id": "taylor", "fighterId": "taylor", "fighterName": "Josh Taylor", "titles": [], "crownsOwned": 1, "fvNow": 1500000, "deltaFV": -10000, "tier": "Fringe Contender" },
+  { "id": "bam", "fighterId": "bam", "fighterName": "Jesse 'Bam' Rodriguez", "titles": ["WBO","IBF"], "crownsOwned": 2, "fvNow": 1200000, "deltaFV": 25000, "tier": "Regional Headliner" }
+]

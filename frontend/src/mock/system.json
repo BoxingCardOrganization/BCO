@@ -1,0 +1,6 @@
+{
+  "generatedAt": "{{now}}",
+  "notes": "Preview mode is active. Data is mock.",
+  "apiBase": "/api",
+  "rpcBase": "/rpc"
+}

@@ -1,0 +1,12 @@
+[
+  { "id": "m1", "fanTier": 2, "fightfolioValue": 250000, "timestamp": "{{now-20m}}", "author": "0xA3b4...51c9", "score": 0, "content": "Haney-Taylor at 140 would outsell rematch at 135." },
+  { "id": "m2", "fanTier": 4, "fightfolioValue": 1800000, "timestamp": "{{now-1h}}", "author": "0x91cE...aa72", "score": 0, "content": "Bivol-Beterbiev undisputed is the one." },
+  { "id": "m3", "fanTier": 3, "fightfolioValue": 950000, "timestamp": "{{now-3h}}", "author": "0x7e19...0a3F", "score": 0, "content": "Tank vs. Shakur PPV would break records next year." },
+  { "id": "m4", "fanTier": 2, "fightfolioValue": 520000, "timestamp": "{{now-8h}}", "author": "0x0Bcd...12Ef", "score": 0, "content": "Canelo at 168 still draws massive gates." },
+  { "id": "m5", "fanTier": 1, "fightfolioValue": 80000, "timestamp": "{{now-12h}}", "author": "0xF1a2...BB77", "score": 0, "content": "Inoue deserves a US stadium show." },
+  { "id": "m6", "fanTier": 3, "fightfolioValue": 1200000, "timestamp": "{{now-18h}}", "author": "0xDeAd...BeEf", "score": 0, "content": "AJ vs. Wilder in the UK still massive." },
+  { "id": "m7", "fanTier": 2, "fightfolioValue": 410000, "timestamp": "{{now-40m}}", "author": "0xa1B2...c3D4", "score": 0, "content": "Usyk’s footwork seminar was unreal." },
+  { "id": "m8", "fanTier": 1, "fightfolioValue": 150000, "timestamp": "{{now-2h}}", "author": "0x9e8d...22Fa", "score": 0, "content": "Prospects card next month looks fun." },
+  { "id": "m9", "fanTier": 4, "fightfolioValue": 2200000, "timestamp": "{{now-4h}}", "author": "0xCc00...FF11", "score": 0, "content": "Saudi shows changed the economics completely." },
+  { "id": "m10", "fanTier": 2, "fightfolioValue": 330000, "timestamp": "{{now-6h}}", "author": "0x1234...5678", "score": 0, "content": "Judging needs transparency across all major commissions." }
+]

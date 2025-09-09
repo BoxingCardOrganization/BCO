@@ -1,0 +1,295 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BCO - Boxing Card Organization</title>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+        }
+        .section {
+            background: white;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .card {
+            border: 1px solid #ddd;
+            padding: 1rem;
+            margin: 0.5rem;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5a6fd8;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🥊 BCO - Boxing Card Organization</h1>
+        <p>Trade Digital Fighter Cards • Redeem for Tickets • Build Your Fightfolio</p>
+    </div>
+
+    <div id="connection-status" class="status error">
+        Not connected to blockchain
+    </div>
+
+    <div class="grid">
+        <div class="section">
+            <h2>🔗 Connection</h2>
+            <button onclick="connectWallet()">Connect Wallet</button>
+            <button onclick="connectToLocal()">Connect to Local Hardhat</button>
+            <div id="wallet-info"></div>
+        </div>
+
+        <div class="section">
+            <h2>👤 Your Profile</h2>
+            <div id="profile-info">
+                <p>Connect wallet to see your profile</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🎯 Fighter Management (Admin)</h2>
+        <div class="card">
+            <h3>Set Fighter Attendance & Supply Cap</h3>
+            <input type="number" id="fighter-id" placeholder="Fighter ID" />
+            <input type="number" id="attendance" placeholder="Attendance Count" />
+            <button onclick="setAttendance()">Update Attendance</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🃏 Mint Fighter Cards</h2>
+        <div class="card">
+            <h3>Generate Mint Signature</h3>
+            <input type="text" id="mint-to" placeholder="Recipient Address" />
+            <input type="number" id="offer-amount" placeholder="Offer Amount (USD)" />
+            <input type="number" id="mint-fighter-id" placeholder="Fighter ID" />
+            <button onclick="generateMintSig()">Generate Signature</button>
+        </div>
+        <div class="card">
+            <h3>Execute Mint</h3>
+            <button onclick="executeMint()">Mint Card</button>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>💬 Trading Ring</h2>
+        <div class="card">
+            <input type="text" id="message-content" placeholder="Share your trading insights..." style="width: 70%;" />
+            <button onclick="postMessage()">Post Message</button>
+        </div>
+        <div id="messages"></div>
+    </div>
+
+    <div class="section">
+        <h2>📊 Platform Stats</h2>
+        <div id="stats"></div>
+    </div>
+
+    <script>
+        let provider, signer, userAddress;
+        let contracts = {};
+
+        // Contract addresses - these will be set after deployment
+        const CONTRACT_ADDRESSES = {
+            // These need to be updated after deployment
+            FighterCard: null,
+            FanTier: null,
+            TradingRing: null,
+            Fightfolio: null
+        };
+
+        async function connectToLocal() {
+            try {
+                provider = new ethers.providers.JsonRpcProvider('/rpc');
+                const accounts = await provider.listAccounts();
+                if (accounts.length > 0) {
+                    signer = provider.getSigner(0);
+                    userAddress = await signer.getAddress();
+                    updateConnectionStatus(true);
+                    updateProfile();
+                }
+            } catch (error) {
+                console.error('Connection failed:', error);
+                updateConnectionStatus(false, error.message);
+            }
+        }
+
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    signer = provider.getSigner();
+                    userAddress = await signer.getAddress();
+                    updateConnectionStatus(true);
+                    updateProfile();
+                } catch (error) {
+                    updateConnectionStatus(false, error.message);
+                }
+            } else {
+                alert('Please install MetaMask or use the local connection');
+            }
+        }
+
+        function updateConnectionStatus(connected, error = '') {
+            const statusEl = document.getElementById('connection-status');
+            if (connected) {
+                statusEl.className = 'status success';
+                statusEl.textContent = `Connected: ${userAddress}`;
+                document.getElementById('wallet-info').innerHTML = `
+                    <p><strong>Address:</strong> ${userAddress}</p>
+                    <p><strong>Network:</strong> ${provider.network ? provider.network.name : 'Local'}</p>
+                `;
+            } else {
+                statusEl.className = 'status error';
+                statusEl.textContent = error ? `Connection failed: ${error}` : 'Not connected to blockchain';
+            }
+        }
+
+        async function updateProfile() {
+            if (!userAddress) return;
+            
+            // This would fetch real data once contracts are deployed
+            document.getElementById('profile-info').innerHTML = `
+                <div class="card">
+                    <h4>Your BCO Profile</h4>
+                    <p><strong>Address:</strong> ${userAddress}</p>
+                    <p><strong>Fan Tier:</strong> Casual (Connect to deployed contracts for real data)</p>
+                    <p><strong>Fightfolio Value:</strong> $0.00</p>
+                    <p><strong>Cards Owned:</strong> 0</p>
+                </div>
+            `;
+        }
+
+        function setAttendance() {
+            const fighterId = document.getElementById('fighter-id').value;
+            const attendance = document.getElementById('attendance').value;
+            
+            if (!fighterId || !attendance) {
+                alert('Please fill in both Fighter ID and Attendance');
+                return;
+            }
+            
+            alert(`Would set Fighter ${fighterId} attendance to ${attendance}\n(Requires deployed contract)`);
+        }
+
+        function generateMintSig() {
+            const to = document.getElementById('mint-to').value;
+            const offer = document.getElementById('offer-amount').value;
+            const fighterId = document.getElementById('mint-fighter-id').value;
+            
+            if (!to || !offer || !fighterId) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            alert(`Would generate mint signature for:\nTo: ${to}\nOffer: $${offer}\nFighter: ${fighterId}\n(Requires deployed contract)`);
+        }
+
+        function executeMint() {
+            alert('Would execute mint with generated signature\n(Requires deployed contract and signature)');
+        }
+
+        function postMessage() {
+            const content = document.getElementById('message-content').value;
+            if (!content.trim()) {
+                alert('Please enter a message');
+                return;
+            }
+            
+            // Add to messages display
+            const messagesEl = document.getElementById('messages');
+            messagesEl.innerHTML = `
+                <div class="card">
+                    <strong>${userAddress.slice(0,6)}...${userAddress.slice(-4)}</strong>
+                    <p>${content}</p>
+                    <small>Just now • Score: 1.0</small>
+                </div>
+            ` + messagesEl.innerHTML;
+            
+            document.getElementById('message-content').value = '';
+        }
+
+        // Initialize stats
+        document.getElementById('stats').innerHTML = `
+            <div class="grid">
+                <div class="card">
+                    <h4>Total Fighters</h4>
+                    <p>Connect to see live data</p>
+                </div>
+                <div class="card">
+                    <h4>Cards Minted</h4>
+                    <p>Connect to see live data</p>
+                </div>
+                <div class="card">
+                    <h4>Active Traders</h4>
+                    <p>Connect to see live data</p>
+                </div>
+            </div>
+        `;
+
+        // Auto-connect to local on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                connectToLocal();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

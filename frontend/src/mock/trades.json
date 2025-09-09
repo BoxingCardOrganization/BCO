@@ -1,0 +1,16 @@
+[
+  { "id": "t1", "fighterName": "Bivol", "side": "buy", "price": 270000, "quantity": 2, "timestamp": "{{now-5m}}" },
+  { "id": "t2", "fighterName": "Beterbiev", "side": "sell", "price": 310000, "quantity": 1, "timestamp": "{{now-10m}}" },
+  { "id": "t3", "fighterName": "Inoue", "side": "buy", "price": 450000, "quantity": 3, "timestamp": "{{now-12m}}" },
+  { "id": "t4", "fighterName": "Crawford", "side": "sell", "price": 520000, "quantity": 1, "timestamp": "{{now-20m}}" },
+  { "id": "t5", "fighterName": "Haney", "side": "buy", "price": 190000, "quantity": 2, "timestamp": "{{now-28m}}" },
+  { "id": "t6", "fighterName": "Taylor", "side": "sell", "price": 175000, "quantity": 1, "timestamp": "{{now-40m}}" },
+  { "id": "t7", "fighterName": "Usyk", "side": "buy", "price": 680000, "quantity": 1, "timestamp": "{{now-50m}}" },
+  { "id": "t8", "fighterName": "Fury", "side": "sell", "price": 610000, "quantity": 2, "timestamp": "{{now-65m}}" },
+  { "id": "t9", "fighterName": "Canelo", "side": "buy", "price": 720000, "quantity": 1, "timestamp": "{{now-70m}}" },
+  { "id": "t10", "fighterName": "Bam", "side": "buy", "price": 140000, "quantity": 4, "timestamp": "{{now-90m}}" },
+  { "id": "t11", "fighterName": "Spence", "side": "sell", "price": 240000, "quantity": 2, "timestamp": "{{now-100m}}" },
+  { "id": "t12", "fighterName": "Canelo", "side": "sell", "price": 700000, "quantity": 1, "timestamp": "{{now-2h}}" },
+  { "id": "t13", "fighterName": "Usyk", "side": "buy", "price": 660000, "quantity": 1, "timestamp": "{{now-140m}}" },
+  { "id": "t14", "fighterName": "Inoue", "side": "sell", "price": 430000, "quantity": 2, "timestamp": "{{now-160m}}" }
+]
