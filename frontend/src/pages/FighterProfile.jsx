@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { getJSON } from '../lib/api'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { api, getJSON } from '../lib/api'
 import Loading from '../components/Loading'
 import ErrorState from '../components/ErrorState'
 import CrownBar from '../components/CrownBar'
 
 function FighterProfile() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [fighter, setFighter] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [news, setNews] = useState([])
+  const [newsLoading, setNewsLoading] = useState(true)
 
   const formatUSD = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(n || 0))
 
@@ -30,12 +33,32 @@ function FighterProfile() {
     load()
   }, [id])
 
+  useEffect(() => {
+    let didCancel = false
+    async function loadNews(){
+      try{
+        setNewsLoading(true)
+        const items = await api.getFighterNews(id)
+        if (!didCancel) setNews(Array.isArray(items) ? items : [])
+      }catch{
+        if (!didCancel) setNews([])
+      } finally {
+        if (!didCancel) setNewsLoading(false)
+      }
+    }
+    if (id) loadNews()
+    return ()=>{ didCancel = true }
+  }, [id])
+
   if (loading) return <Loading />
   if (error) return <ErrorState title="Failed to load fighter" description={error} onRetry={load} />
   if (!fighter) return <ErrorState title="Not found" description="Fighter not found" />
 
   const delta = Number(fighter.deltaFV || 0)
   const isUp = delta >= 0
+  const currentCap = Number(fighter.currentCap || 0)
+  const mintedCount = Number(fighter.mintedCount || 0)
+  const available = Math.max(0, currentCap - mintedCount)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,7 +81,14 @@ function FighterProfile() {
               </div>
             </div>
             <div className="mt-4 md:mt-0 flex items-center gap-3">
-              <Link to={`/offer-builder?fighter=${encodeURIComponent(fighter.id)}`} className="btn-primary">Buy</Link>
+              <button
+                type="button"
+                disabled={available === 0}
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => navigate(`/buy-card/${fighter.id}`)}
+              >
+                {available > 0 ? 'Buy' : 'Sold Out'}
+              </button>
             </div>
           </div>
 
@@ -85,6 +115,32 @@ function FighterProfile() {
           </div>
         </div>
 
+        {/* News */}
+        <section className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">News</h3>
+          </div>
+          {newsLoading ? (
+            <div className="text-sm text-gray-500">Loading.</div>
+          ) : (news.length === 0 ? (
+            <div className="text-sm text-gray-500">No news yet</div>
+          ) : (
+            <ul className="space-y-2">
+              {news.slice(0,6).map(n => (
+                <li key={n.id} className="flex items-start gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${n.type==='video' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                    {n.type === 'video' ? 'Video' : 'Article'}
+                  </span>
+                  <a href={n.url} target="_blank" rel="noopener noreferrer" className="text-sm text-gray-900 hover:underline line-clamp-2">
+                    {n.title}
+                  </a>
+                  <span className="ml-auto text-xs text-gray-500">{new Date(n.publishedAt).toLocaleDateString()}</span>
+                </li>
+              ))}
+            </ul>
+          ))}
+        </section>
+
         {/* Stats */}
         {fighter.stats && Object.keys(fighter.stats).length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
@@ -100,27 +156,6 @@ function FighterProfile() {
           </div>
         )}
 
-        {/* News */}
-        {Array.isArray(fighter.news) && fighter.news.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">News</h2>
-            <ul className="space-y-3">
-              {fighter.news.map((n, idx) => (
-                <li key={idx} className="flex items-center justify-between">
-                  <div>
-                    <a href={n.url} target="_blank" rel="noopener noreferrer" className="text-bco-primary hover:underline font-medium">
-                      {n.title || n.url}
-                    </a>
-                    {n.date && <div className="text-xs text-gray-500">{n.date}</div>}
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
     </div>
   )

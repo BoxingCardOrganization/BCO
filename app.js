@@ -1,6 +1,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const fetch = require('node-fetch');
 const path = require('path');
 const fs = require('fs');
@@ -15,6 +16,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 
 // Error handling middleware for JSON parsing
@@ -28,6 +30,36 @@ app.use((err, req, res, next) => {
 
 // Serve static files
 app.use(express.static('.'));
+
+// Auth and Profile routes
+try {
+  const { router: authRouter } = require('./backend/auth')
+  const profileRouter = require('./backend/profile')
+  app.use('/api/auth', authRouter)
+  app.use('/api/profile', profileRouter)
+} catch (e) {
+  console.warn('Auth/Profile routes not initialized:', e?.message)
+}
+
+// Payments and webhooks
+try {
+  const paymentsRouter = require('./backend/payments')
+  const { handleStripeWebhook } = require('./backend/webhooks')
+  app.use('/api/payments', paymentsRouter)
+  // Stripe webhook needs raw body for signature verification
+  app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), handleStripeWebhook)
+} catch (e) {
+  console.warn('Payments routes not initialized:', e?.message)
+}
+
+// Mints, receipts, holdings, trades
+try {
+  const mintsRouter = require('./backend/mints')
+  // Mount under /api to provide /api/mints, /api/mints/quote, /api/receipts/:id, /api/fightfolio/holdings, /api/trades
+  app.use('/api', mintsRouter)
+} catch (e) {
+  console.warn('Mints routes not initialized:', e?.message)
+}
 
 // Utility: load fighter data with field normalization
 function normalizeFighter(raw, fallbackId) {
@@ -52,6 +84,8 @@ function normalizeFighter(raw, fallbackId) {
     ? raw.titles.filter(Boolean).map(String)
     : [];
 
+  const attendanceSourceUrl = typeof raw.attendanceSourceUrl === 'string' ? raw.attendanceSourceUrl : ''
+
   const base = {
     id,
     name,
@@ -61,6 +95,7 @@ function normalizeFighter(raw, fallbackId) {
     stats,
     news,
     titles,
+    attendanceSourceUrl,
   };
   return { ...base, deltaFV: valuation - prevValuation, titlesCount: titles.length };
 }
@@ -117,6 +152,44 @@ function readFightersFile() {
   }
 }
 
+// === Fighter News storage helpers ===
+function readNewsFile() {
+  const newsPath = path.join(__dirname, 'data', 'fighternews.json');
+  try {
+    if (!fs.existsSync(newsPath)) {
+      fs.writeFileSync(newsPath, JSON.stringify({}, null, 2));
+    }
+    const text = fs.readFileSync(newsPath, 'utf8');
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === 'object') return parsed;
+    return {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function writeNewsFile(obj) {
+  const newsPath = path.join(__dirname, 'data', 'fighternews.json');
+  fs.writeFileSync(newsPath, JSON.stringify(obj || {}, null, 2));
+}
+
+function isValidNewsType(t) { return t === 'article' || t === 'video' }
+function parseDate(input) {
+  if (!input) return null;
+  if (typeof input === 'number') {
+    const d = new Date(input);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(input);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function isAdmin(req) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return true; // If not configured, allow for local dev
+  return (req.headers['x-admin-token'] || req.headers['X-Admin-Token']) === token;
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ ok: true, timestamp: new Date().toISOString() });
@@ -145,6 +218,32 @@ app.get('/api/fighters', (req, res) => {
   }
 });
 
+// Simple messages API for Trading Ring
+const __messages = []
+app.get('/api/messages', (req, res) => {
+  res.json(__messages)
+})
+
+app.post('/api/messages', (req, res) => {
+  const { feeUsd } = req.body || {}
+  const amt = Number(feeUsd)
+  if (!Number.isFinite(amt) || Number(amt.toFixed(2)) !== 1.0) {
+    return res.status(400).json({ error: 'Invalid posting fee. Expected 1.00 USD.' })
+  }
+  const now = Date.now()
+  const msg = {
+    id: now,
+    timestamp: now,
+    content: req.body?.content,
+    author: req.body?.author || '0xSERVER...DEMO',
+    fanTier: req.body?.fanTier || 1,
+    fightfolioValue: req.body?.fightfolioValue || 0,
+    score: req.body?.score || 0,
+  }
+  __messages.unshift(msg)
+  res.json(msg)
+})
+
 // Fighter detail: full object including stats/news and computed deltaFV
 app.get('/api/fighters/:id', (req, res) => {
   try {
@@ -157,6 +256,143 @@ app.get('/api/fighters/:id', (req, res) => {
     res.status(e.statusCode || 500).json({ error: msg });
   }
 });
+
+// Fighter News: GET list
+app.get('/api/fighters/:id/news', (req, res) => {
+  try {
+    const id = String(req.params.id)
+    const store = readNewsFile()
+    const list = Array.isArray(store[id]) ? store[id] : []
+    const sorted = [...list].sort((a,b)=>{
+      const da = new Date(a.publishedAt).getTime() || 0
+      const db = new Date(b.publishedAt).getTime() || 0
+      return db - da
+    })
+    res.json(sorted)
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load news' })
+  }
+})
+
+// Admin: Create news item
+app.post('/api/admin/fighters/:id/news', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Forbidden' })
+  const id = String(req.params.id)
+  const { type, title, url, publishedAt } = req.body || {}
+  if (!isValidNewsType(type)) return res.status(400).json({ error: "type must be 'article' or 'video'" })
+  if (!title || typeof title !== 'string') return res.status(400).json({ error: 'title is required' })
+  if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url)) return res.status(400).json({ error: 'url must be http(s)' })
+  const d = parseDate(publishedAt)
+  if (!d) return res.status(400).json({ error: 'publishedAt must be epoch ms or ISO date' })
+
+  const store = readNewsFile()
+  const list = Array.isArray(store[id]) ? store[id] : []
+  const item = { id: String(Date.now()), type, title, url, publishedAt: d.toISOString() }
+  list.push(item)
+  store[id] = list
+  writeNewsFile(store)
+  res.json(item)
+})
+
+// Admin: Update news item
+app.patch('/api/admin/fighters/:id/news/:newsId', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Forbidden' })
+  const id = String(req.params.id)
+  const newsId = String(req.params.newsId)
+  const store = readNewsFile()
+  const list = Array.isArray(store[id]) ? store[id] : []
+  const idx = list.findIndex(n => String(n.id) === newsId)
+  if (idx === -1) return res.status(404).json({ error: 'News item not found' })
+
+  const patch = req.body || {}
+  if (patch.type !== undefined && !isValidNewsType(patch.type)) return res.status(400).json({ error: "type must be 'article' or 'video'" })
+  if (patch.title !== undefined && (!patch.title || typeof patch.title !== 'string')) return res.status(400).json({ error: 'title must be non-empty string' })
+  if (patch.url !== undefined && (typeof patch.url !== 'string' || (patch.url && !/^https?:\/\//i.test(patch.url)))) return res.status(400).json({ error: 'url must be http(s)' })
+  if (patch.publishedAt !== undefined) {
+    const d = parseDate(patch.publishedAt)
+    if (!d) return res.status(400).json({ error: 'publishedAt must be epoch ms or ISO date' })
+    patch.publishedAt = d.toISOString()
+  }
+
+  const updated = { ...list[idx], ...patch }
+  list[idx] = updated
+  store[id] = list
+  writeNewsFile(store)
+  res.json(updated)
+})
+
+// Admin: Delete news item
+app.delete('/api/admin/fighters/:id/news/:newsId', (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Forbidden' })
+  const id = String(req.params.id)
+  const newsId = String(req.params.newsId)
+  const store = readNewsFile()
+  const list = Array.isArray(store[id]) ? store[id] : []
+  const next = list.filter(n => String(n.id) !== newsId)
+  store[id] = next
+  writeNewsFile(store)
+  res.json({ ok: true })
+})
+
+// Admin: update fighter fields (currently supports attendanceSourceUrl)
+app.patch('/api/admin/fighters/:id', (req, res) => {
+  const id = String(req.params.id)
+  const { attendanceSourceUrl } = req.body || {}
+
+  // Validate URL: allow empty string or http(s)
+  if (typeof attendanceSourceUrl !== 'undefined') {
+    if (attendanceSourceUrl !== '' && typeof attendanceSourceUrl !== 'string') {
+      return res.status(400).json({ error: 'attendanceSourceUrl must be a string' })
+    }
+    if (attendanceSourceUrl && !/^https?:\/\//i.test(attendanceSourceUrl)) {
+      return res.status(400).json({ error: 'attendanceSourceUrl must start with http:// or https://' })
+    }
+  }
+
+  const dataPath = path.join(__dirname, 'data', 'fighterprofile.json')
+  try {
+    const rawText = fs.readFileSync(dataPath, 'utf8')
+    const parsed = JSON.parse(rawText)
+
+    let found = false
+    if (Array.isArray(parsed)) {
+      for (let i = 0; i < parsed.length; i++) {
+        const f = parsed[i]
+        if (String(f?.id) === id) {
+          if (typeof attendanceSourceUrl !== 'undefined') parsed[i].attendanceSourceUrl = attendanceSourceUrl
+          found = true
+          break
+        }
+      }
+    } else if (parsed && typeof parsed === 'object') {
+      // Object map; try direct key or search values
+      if (parsed[id]) {
+        if (typeof attendanceSourceUrl !== 'undefined') parsed[id].attendanceSourceUrl = attendanceSourceUrl
+        found = true
+      } else {
+        for (const key of Object.keys(parsed)) {
+          if (String(parsed[key]?.id) === id) {
+            if (typeof attendanceSourceUrl !== 'undefined') parsed[key].attendanceSourceUrl = attendanceSourceUrl
+            found = true
+            break
+          }
+        }
+      }
+    }
+
+    if (!found) return res.status(404).json({ error: 'Fighter not found' })
+
+    fs.writeFileSync(dataPath, JSON.stringify(parsed, null, 2))
+
+    // Return updated fighter
+    const fighters = readFightersFile();
+    const fighter = fighters.find((f) => String(f.id) === id)
+    return res.json(fighter)
+  } catch (e) {
+    const msg = e?.message || 'Failed to update fighter'
+    return res.status(500).json({ error: msg })
+  }
+})
 
 // JSON-RPC proxy to Hardhat node
 app.post('/rpc', async (req, res) => {

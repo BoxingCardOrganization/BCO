@@ -33,8 +33,11 @@ export default function FightfolioPage(){
     try {
       setLoading(true)
       setError(null)
-      const res = await api.getFightfolio()
-      setData(res)
+      const [profile, holdings] = await Promise.all([
+        api.getUserProfile().catch(()=>({ fightfolioValue: 0, fanTier: 1 })),
+        api.getHoldings().catch(()=>[])
+      ])
+      setData({ fightfolioValue: profile?.fightfolioValue||0, fanTier: profile?.fanTier||1, holdings, offers: [], activity: [] })
     } catch (e) {
       setError(e?.message || 'Failed to load')
     } finally {

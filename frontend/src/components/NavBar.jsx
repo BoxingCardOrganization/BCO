@@ -2,18 +2,21 @@
 import React, { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import logo from '@/assets/logo.png'
+import FightfolioButton from './fightfolio/FightfolioButton'
+import { useMe } from '@/hooks/useMe'
 
 function NavBar() {
   const location = useLocation()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const { me } = useMe()
 
-  const navItems = [
+  const baseItems = [
     { path: '/', label: 'Home' },
     { path: '/offer-builder', label: 'Buy Cards' },
     { path: '/trading-ring', label: 'Trading Ring' },
-    { path: '/fightfolio', label: 'Fightfolio' },
     { path: '/preview', label: 'Preview' }
   ]
+  const navItems = me ? [...baseItems, { path: '/fightfolio', label: 'Fightfolio' }] : baseItems
 
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
@@ -41,11 +44,9 @@ function NavBar() {
             ))}
           </div>
 
-          {/* Connect Wallet Button */}
+          {/* Fightfolio Button */}
           <div className="hidden md:flex items-center space-x-4">
-            <button className="btn-secondary text-sm">
-              Connect Wallet
-            </button>
+            <FightfolioButton />
           </div>
 
           {/* Mobile menu button */}
@@ -77,9 +78,9 @@ function NavBar() {
                   {item.label}
                 </Link>
               ))}
-              <button className="btn-secondary text-sm mt-4">
-                Connect Wallet
-              </button>
+              <div className="mt-4">
+                <FightfolioButton />
+              </div>
             </div>
           </div>
         )}

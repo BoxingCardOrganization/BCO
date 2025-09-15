@@ -38,6 +38,7 @@ function AdminValuations() {
   
   const [previewFV, setPreviewFV] = useState(null)
   const [weekEnding, setWeekEnding] = useState('')
+  const [attendanceUrl, setAttendanceUrl] = useState('')
 
   useEffect(() => {
     loadFighters()
@@ -61,6 +62,7 @@ function AdminValuations() {
 
   const handleFighterSelect = async (fighter) => {
     setSelectedFighter(fighter)
+    setAttendanceUrl('')
     // Load last week's data if available
     try {
       const lastWeekData = await api.getWeeklyValuation(fighter.id, weekEnding)
@@ -68,6 +70,11 @@ function AdminValuations() {
         setPublicStats(lastWeekData.publicStats || publicStats)
         setNewsTags(lastWeekData.newsTags || newsTags)
       }
+      // Load full fighter for editable fields
+      try {
+        const full = await api.getFighter(fighter.id)
+        setAttendanceUrl(full?.attendanceSourceUrl || '')
+      } catch {}
     } catch (err) {
       // No previous data, start fresh
       console.log('No previous data found')
@@ -213,6 +220,35 @@ function AdminValuations() {
           <div className="lg:col-span-2">
             {selectedFighter ? (
               <div className="space-y-6">
+                {/* Admin: Attendance Source URL */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Profile Settings</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Attendance Source URL</label>
+                      <input
+                        type="url"
+                        placeholder="https://example.com/article"
+                        value={attendanceUrl}
+                        onChange={(e)=>setAttendanceUrl(e.target.value)}
+                        className="input-base w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Used for the "Headlined event" link on Fighter Profile.</p>
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        className="btn-secondary w-full"
+                        onClick={async()=>{
+                          try{
+                            await api.updateFighter(selectedFighter.id, { attendanceSourceUrl: attendanceUrl || '' })
+                            alert('Attendance source saved')
+                          }catch(e){ alert(e?.message || 'Failed to save') }
+                        }}
+                      >Save</button>
+                    </div>
+                  </div>
+                </div>
                 {/* Public Stats */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">

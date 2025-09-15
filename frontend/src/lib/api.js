@@ -205,6 +205,18 @@ const MOCK_MESSAGES = Array.isArray(messagesJSON) ? messagesJSON.map(m => ({
   timestamp: parseMaybeNow(m.timestamp),
 })) : []
 
+// In-memory reaction store for MOCK and safe fallbacks
+const __reactionStore = new Map() // id -> { likes, dislikes }
+
+function ensureEngagementShape(msg){
+  const e = msg.engagement || {}
+  const store = __reactionStore.get(String(msg.id)) || {}
+  const likes = Number(e.likes ?? msg.likes ?? store.likes ?? 0) | 0
+  const replies = Number(e.replies ?? msg.replies ?? 0) | 0
+  const dislikes = Number(e.dislikes ?? msg.dislikes ?? store.dislikes ?? 0) | 0
+  return { ...msg, engagement: { likes, replies, dislikes } }
+}
+
 // Helpers to generate mock trades and trending
 function randChoice(arr){ return arr[Math.floor(Math.random()*arr.length)] }
 function genMockTrades(count=12){
@@ -292,6 +304,59 @@ export const api = {
     try { return await fetchAPI(`/fighters/${id}`) } catch { return mockFighters.find(f => String(f.id) === String(id)) || null }
   },
 
+  // Fighter news
+  async getFighterNews(fighterId) {
+    try {
+      return await fetchAPI(`/fighters/${encodeURIComponent(fighterId)}/news`)
+    } catch (e) {
+      return []
+    }
+  },
+
+  async createFighterNews(fighterId, { type, title, url, publishedAt, adminToken }) {
+    const res = await fetch(`${API_BASE}/admin/fighters/${encodeURIComponent(fighterId)}/news`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(adminToken ? { 'x-admin-token': adminToken } : {}) },
+      body: JSON.stringify({ type, title, url, publishedAt })
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new APIError(data?.error || 'Create failed', res.status, data)
+    return data
+  },
+
+  async updateFighterNews(fighterId, newsId, patch, adminToken) {
+    const res = await fetch(`${API_BASE}/admin/fighters/${encodeURIComponent(fighterId)}/news/${encodeURIComponent(newsId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...(adminToken ? { 'x-admin-token': adminToken } : {}) },
+      body: JSON.stringify(patch || {})
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new APIError(data?.error || 'Update failed', res.status, data)
+    return data
+  },
+
+  async deleteFighterNews(fighterId, newsId, adminToken) {
+    const res = await fetch(`${API_BASE}/admin/fighters/${encodeURIComponent(fighterId)}/news/${encodeURIComponent(newsId)}`, {
+      method: 'DELETE',
+      headers: { ...(adminToken ? { 'x-admin-token': adminToken } : {}) }
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new APIError(data?.error || 'Delete failed', res.status, data)
+    return data
+  },
+  
+  // Admin: update fighter fields (e.g., attendanceSourceUrl)
+  async updateFighter(id, patch) {
+    const res = await fetch(`${API_BASE}/admin/fighters/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch || {})
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new APIError(data?.error || 'Update failed', res.status, data)
+    return data
+  },
+
   // Trading Ring messages
   async getMessages() {
     if (MOCK) {
@@ -304,8 +369,8 @@ export const api = {
           author: `0x${Math.random().toString(16).slice(2,6)}...${Math.random().toString(16).slice(2,6)}`,
           content: randChoice([
             'Inoue vs. Tank at 126 would be chaos.',
-            'Usyk–Fury II needs a bigger venue.',
-            'Haney–Taylor at 140 > rematch at 135.',
+            'Usyk-Fury II needs a bigger venue.',
+            'Haney-Taylor at 140 > rematch at 135.',
             'Bam vs. Sunny for all the belts.',
             'Canelo still the A-side at 168.'
           ]),
@@ -315,12 +380,40 @@ export const api = {
           score: 0,
         })
       }
-      return base
+      // attach engagement defaults and any mock reactions
+      return base.map(ensureEngagementShape)
     }
-    return this.request('/messages', {}, mockMessages)
+    try {
+      const arr = await fetchAPI('/messages')
+      return (Array.isArray(arr) ? arr : []).map(ensureEngagementShape)
+    } catch (e) {
+      // safe fallback to mock with engagement defaults
+      return (mockMessages || []).map(ensureEngagementShape)
+    }
+  },
+
+  // Auth
+  async me(){
+    const res = await fetch(`${API_BASE}/auth/me`)
+    if (!res.ok) throw new Error('Not logged in')
+    return await res.json()
+  },
+  async login({ email, password }){
+    const res = await fetch(`${API_BASE}/auth/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) })
+    const data = await res.json().catch(()=>({}))
+    if (!res.ok) throw new Error(data?.error || 'Login failed')
+    return data
+  },
+  async signup({ email, password }){
+    const res = await fetch(`${API_BASE}/auth/signup`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email, password }) })
+    const data = await res.json().catch(()=>({}))
+    if (!res.ok) throw new Error(data?.error || 'Signup failed')
+    return data
   },
 
   async postMessage(messageData) {
+    // Always include flat $1 posting fee in payload
+    const payload = { ...messageData, feeUsd: 1.00 }
     if (MOCK) {
       const newMessage = {
         id: String(Date.now()),
@@ -342,8 +435,101 @@ export const api = {
     }
     return this.request('/messages', {
       method: 'POST',
-      body: JSON.stringify(messageData)
+      body: JSON.stringify(payload)
     }, newMessage)
+  },
+
+  async reactToMessage(id, action){
+    // Accept: 'like','dislike','undo-like','undo-dislike'
+    const key = String(id)
+    if (MOCK) {
+      const curr = __reactionStore.get(key) || { likes: 0, dislikes: 0 }
+      if (action === 'like') curr.likes = Math.max(0, (curr.likes||0) + 1)
+      else if (action === 'dislike') curr.dislikes = Math.max(0, (curr.dislikes||0) + 1)
+      else if (action === 'undo-like') curr.likes = Math.max(0, (curr.likes||0) - 1)
+      else if (action === 'undo-dislike') curr.dislikes = Math.max(0, (curr.dislikes||0) - 1)
+      __reactionStore.set(key, curr)
+      return { ok: true }
+    }
+    // Real mode: try API, but if not present, resolve ok so UI won't break
+    try{
+      await fetch(`${API_BASE}/messages/${encodeURIComponent(key)}/react`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      })
+      // Even if non-2xx, we swallow below to keep {ok:true}
+      return { ok: true }
+    }catch{
+      return { ok: true }
+    }
+  },
+
+  // Payments
+  async createCheckout({ amountUsd, purpose, fighterId, qty }) {
+    try {
+      const payload = { amountUsd, purpose, fighterId, qty }
+      const res = await fetch(`${API_BASE}/payments/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new APIError(data?.error || 'Checkout failed', res.status, data)
+      return data // { ok, url?, orderId }
+    } catch (e) {
+      if (MOCK) return { ok: true, orderId: `mock_${Date.now()}` }
+      throw e
+    }
+  },
+
+  // Minting
+  async quoteMint({ fighterId, qty }) {
+    try {
+      const res = await fetch(`${API_BASE}/mints/quote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fighterId, qty })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new APIError(data?.error || 'Quote failed', res.status, data)
+      return data // { ok:true, currency, lineItems, totalUsd }
+    } catch (e) {
+      if (MOCK) {
+        const q = Number(qty||1)
+        const base = 5*q, platform = base*0.1, network=0.25
+        return { ok:true, currency:'USD', lineItems:[{label:`Base (${q} @ $5.00)`, amountUsd:+base.toFixed(2)},{label:'Platform fee (10%)', amountUsd:+platform.toFixed(2)},{label:'Network fee', amountUsd:+network.toFixed(2)}], totalUsd:+(base+platform+network).toFixed(2) }
+      }
+      throw e
+    }
+  },
+
+  async mintCard({ orderId }) {
+    try {
+      const res = await fetch(`${API_BASE}/mints`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new APIError(data?.error || 'Mint failed', res.status, data)
+      return data // { ok:true, receiptId, receipt }
+    } catch (e) {
+      if (MOCK) {
+        const id = `r_${Date.now()}`
+        return { ok:true, receiptId: id, receipt: { id, totalUsd: 5, lineItems: [], createdAt: new Date().toISOString() } }
+      }
+      throw e
+    }
+  },
+
+  async getHoldings() {
+    try {
+      return await fetchAPI('/fightfolio/holdings')
+    } catch (e) {
+      if (MOCK) return []
+      throw e
+    }
   },
 
   // Trades (MOCK and placeholder real)
@@ -390,9 +576,16 @@ export const api = {
 
   async getUserProfile() {
     if (MOCK) {
-      return { fightfolioValue: 12500, fanTier: 3 }
+      // Ensure FV is consistent with tier in MOCK mode
+      const defaultTier = 2 // Analyst
+      const defaultFV = 1250
+      const tier = Number(defaultTier)
+      const minByTier = { 1: 0, 2: 500, 3: 2500, 4: 10000 }
+      const rawFV = Number(defaultFV)
+      const fightfolioValue = Math.max(isFinite(rawFV) ? rawFV : 0, minByTier[tier] || 0)
+      return { fightfolioValue, fanTier: tier }
     }
-    return this.request('/user/profile', {}, {
+    return this.request('/profile', {}, {
       fightfolioValue: 4200,
       fanTier: 2,
       address: "0x1234...5678"
